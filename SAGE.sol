@@ -328,7 +328,7 @@ abstract contract ERC314 is IEERC314 {
 
         if (_buy) {
             uint256 valueAfterFee = (value * (10000 - fee)) / 10000;
-            return ((valueAfterFee * reserveToken)) / (reserveETH + value);
+            return ((valueAfterFee * reserveToken)) / (reserveETH + valueAfterFee);
         } else {
             uint256 ethValue = ((value * reserveETH)) / (reserveToken + value);
             ethValue = (ethValue * (10000 - fee)) / 10000;
@@ -350,13 +350,13 @@ abstract contract ERC314 is IEERC314 {
             ETHafterFee = msg.value - feeAmount;
         }
 
+        unchecked {
+            accruedFeeAmount += feeAmount;
+        }
         (uint256 reserveETH, uint256 reserveToken) = getReserves();
 
         uint256 tokenAmount = (ETHafterFee * reserveToken) / reserveETH;
         require(tokenAmount > 0, "Bought amount too low");
-        unchecked {
-            accruedFeeAmount += feeAmount;
-        }
 
         if (maxWalletEnable) {
             require(
