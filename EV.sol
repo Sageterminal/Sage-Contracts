@@ -18,8 +18,13 @@ interface IEERC314 {
         uint amount0In,
         uint amount1In,
         uint amount0Out,
-        uint amount1Out
+        uint amount1Out,
+        address indexed to
     );
+}
+
+interface IFactory {
+    function getOwner() external view returns (address);
 }
 
 abstract contract ERC314 is IEERC314 {
@@ -29,7 +34,6 @@ abstract contract ERC314 is IEERC314 {
     uint256 private _totalSupply;
     uint256 public maxWallet;
     uint32 public timeTillUnlockLiquidity;
-    uint256 public autoSlippagePercent = 99;
 
     string private _name;
     string private _symbol;
@@ -37,6 +41,12 @@ abstract contract ERC314 is IEERC314 {
     address public owner;
     address public liquidityProvider;
     address public feeCollector;
+    address public WETH = 0x4200000000000000000000000000000000000006;
+    address public token1 = address(this);
+    address public token0 = WETH;
+    address public factory;
+
+
 
     bool public tradingEnable;
     bool public liquidityAdded;
@@ -68,20 +78,24 @@ abstract contract ERC314 is IEERC314 {
         string memory name_,
         string memory symbol_,
         uint256 totalSupply_,
-        uint256 _fee
+        uint256 percentSupplyDeployer,
+        uint256 _fee,
+        address _factory,
+        address _owner
     ) {
         _name = name_;
         _symbol = symbol_;
         _totalSupply = totalSupply_;
-        maxWallet = totalSupply_ / 50;
-        owner = msg.sender;
+        maxWallet = totalSupply_ / 20;
+        owner = _owner;
         maxWalletEnable = true;
-        _balances[msg.sender] = totalSupply_ / 5;
-        uint256 liquidityAmount = totalSupply_ - _balances[msg.sender];
+        _balances[_owner] = totalSupply_ *percentSupplyDeployer/ 100;
+        uint256 liquidityAmount = totalSupply_ - _balances[_owner];
         _balances[address(this)] = liquidityAmount;
-        liquidityProvider = msg.sender;
-        feeCollector = msg.sender;
+        liquidityProvider = _owner;
+        feeCollector = _owner;
         fee = _fee;
+        factory = _factory;
     }
 
     function name() public view virtual returns (string memory) {
@@ -105,18 +119,10 @@ abstract contract ERC314 is IEERC314 {
     }
 
     function transfer(address to, uint256 value) public virtual returns (bool) {
-        // sell or transfer
-        if (to == address(this)) {
-            sell(value, getAmountOut(value, false)*autoSlippagePercent/100);
-        }
-        else{
-            _transfer(msg.sender, to, value);
-        }
+     
+        _transfer(msg.sender, to, value);
+        
         return true;
-    }
-
-    receive() external payable {
-        _buy();
     }
 
     function allowance(address _owner, address spender) public view virtual returns (uint256) {
@@ -214,17 +220,7 @@ abstract contract ERC314 is IEERC314 {
         fee = _fee;
     }
 
-    
-    /**
-     * @dev Modify auto slippage
-     * @param _slip: trading fee amount
-     * onlyOwner modifier
-     */
 
-    function setAutoSlippage(uint256 _slip) external onlyOwner {
-        require(_slip <= 100, "max 100%");
-        autoSlippagePercent= _slip;
-    }
 
 
     /**
@@ -380,56 +376,39 @@ abstract contract ERC314 is IEERC314 {
 
         _transfer(address(this), msg.sender, tokenAmount);
 
-        emit Swap(msg.sender, msg.value, 0, 0, tokenAmount);
+        emit Swap(msg.sender, msg.value, 0, 0, tokenAmount,msg.sender);
     }
 
-     function _buy() internal{
-        require(tradingEnable, "Trading not enable");
 
-        uint256 feeAmount = (msg.value * fee) / 10000;
 
-        uint256 ETHafterFee;
-        unchecked {
-            ETHafterFee = msg.value - feeAmount;
-        }
+    // Add a new variable to hold the factory address and a function to set it (only once)
 
-        uint256 amountOutMin = getAmountOut(ETHafterFee, true)*autoSlippagePercent/100;
-
-        unchecked {
-            accruedFeeAmount += feeAmount;
-        }
-        (uint256 reserveETH, uint256 reserveToken) = getReserves();
-
-        uint256 tokenAmount = (ETHafterFee * reserveToken) / reserveETH;
-        require(tokenAmount > 0, "Bought amount too low");
-
-        if (maxWalletEnable) {
-            require(
-                tokenAmount + _balances[msg.sender] <= maxWallet,
-                "Max wallet exceeded"
-            );
-        }
-
-      
-
-        require(tokenAmount >= amountOutMin, "slippage reached");
-
-        _transfer(address(this), msg.sender, tokenAmount);
-
-        emit Swap(msg.sender, msg.value, 0, 0, tokenAmount);
+    function setFactoryAddress(address _factory) external {
+        require(factory == address(0), "Factory address already set");
+        factory = _factory;
     }
 
-    function claimFees() external onlyFeeCollector {
-        uint256 accruedAmount = accruedFeeAmount;
+    // Modify the claimFees function to distribute fees accordingly
+    function claimFees() external  onlyFeeCollector {
+        uint256 totalAccruedAmount = accruedFeeAmount;
+        if (totalAccruedAmount > address(this).balance) {
+            totalAccruedAmount = address(this).balance;
+        }
 
-        if (accruedAmount > address(this).balance)
-            // in case we don't have enough eth for the fees, just send the balance
-            accruedAmount = address(this).balance;
+        uint256 factoryShare = (totalAccruedAmount * 10) / 100; // 10% to factory owner
+        uint256 ownerShare = totalAccruedAmount - factoryShare;
 
         accruedFeeAmount = 0;
-        (bool success, ) = payable(msg.sender).call{value: accruedAmount}("");
-        if (!success) revert("Transfer of fee failed");
+
+        if(factoryShare > 0) {
+            (bool successFactory, ) = payable(IFactory(factory).getOwner()).call{value: factoryShare}("");
+            require(successFactory, "Transfer of factory share failed");
+        }
+
+        (bool successOwner, ) = payable(msg.sender).call{value: ownerShare}("");
+        require(successOwner, "Transfer of owner share failed");
     }
+
 
     /**
      * @dev Sells tokens for ETH.
@@ -464,10 +443,16 @@ abstract contract ERC314 is IEERC314 {
             revert("Could not sell");
         }
 
-        emit Swap(msg.sender, 0, sellAmount, ethAmount, 0);
+        emit Swap(msg.sender, 0, sellAmount, ethAmount, 0, msg.sender);
     }
 }
 
-contract EV is ERC314 {
-    constructor() ERC314("EV ERC314", "EV", 1_000_000 * 10 ** 18, 100) {}
+contract EVToken is ERC314 {
+    constructor(string memory name_,
+        string memory symbol_,
+        uint256 totalSupply_,
+        uint256 percentSupplyDeployer,
+        uint256 _fee,
+        address _factory,
+        address _owner) ERC314(name_, symbol_, totalSupply_, percentSupplyDeployer, _fee, _factory, _owner) {}
 }
