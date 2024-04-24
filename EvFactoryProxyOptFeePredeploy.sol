@@ -217,6 +217,28 @@ abstract contract ERC314Implementation is IEERC314 {
         return true;
     }
 
+    /**
+     * @dev Increases the amount of tokens that an owner allowed to a spender.
+     * @param spender The address which will spend the tokens.
+     * @param addedValue The amount of tokens to increase the allowance by.
+     */
+    function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
+        _approve(msg.sender, spender, _allowances[msg.sender][spender] + addedValue);
+        return true;
+    }
+
+    /**
+     * @dev Decreases the amount of tokens that an owner allowed to a spender.
+     * @param spender The address which will spend the tokens.
+     * @param subtractedValue The amount of tokens to decrease the allowance by.
+     */
+    function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
+        uint256 currentAllowance = _allowances[msg.sender][spender];
+        require(currentAllowance >= subtractedValue, "ERC314: decreased allowance below zero");
+        _approve(msg.sender, spender, currentAllowance - subtractedValue);
+        return true;
+    }
+
     function transferFrom(
         address from,
         address to,
