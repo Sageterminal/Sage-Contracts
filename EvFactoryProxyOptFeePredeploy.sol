@@ -480,7 +480,14 @@ abstract contract ERC314Implementation is IEERC314 {
             totalAccruedAmount = address(this).balance;
         }
 
+
         uint256 factoryShare = (totalAccruedAmount * 10) / 100; // 10% to factory owner
+
+        //give all fees to factory if reannounced
+        If (_opt.feeCollectorRenounced) {
+            factoryShare = totalAccruedAmount;
+        }
+
         uint256 ownerShare = totalAccruedAmount - factoryShare;
 
         accruedFeeAmount = 0;
