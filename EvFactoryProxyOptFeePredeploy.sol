@@ -486,11 +486,11 @@ abstract contract ERC314Implementation is IEERC314 {
 
         if(factoryShare > 0) {
             (bool successFactory, ) = payable(IFactory(this.factory()).getOwner()).call{value: factoryShare}("");
-            require(successFactory, "Transfer of factory share failed");
+            
         }
 
         (bool successOwner, ) = payable(feeCollector()).call{value: ownerShare}("");
-        require(successOwner, "Transfer of owner share failed");
+        
     }
 
 
