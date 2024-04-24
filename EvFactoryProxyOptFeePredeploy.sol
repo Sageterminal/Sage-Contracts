@@ -395,6 +395,7 @@ abstract contract ERC314Implementation is IEERC314 {
         if (!success) {
             revert("Could not remove liquidity");
         }
+        _opt.liquidityAdded = false; 
 
         emit RemoveLiquidity(address(this).balance);
     }
