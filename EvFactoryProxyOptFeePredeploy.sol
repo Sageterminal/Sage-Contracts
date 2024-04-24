@@ -50,7 +50,6 @@ abstract contract ERC314Implementation is IEERC314 {
     address private _liquidityProvider;
     address private _feeCollector;
 
-    mapping(address => uint32) public lastTransaction;
     uint256 public accruedFeeAmount;
 
     modifier onlyOwner() {
@@ -300,15 +299,6 @@ abstract contract ERC314Implementation is IEERC314 {
         if (_fee != 0) _opt.feeDisable = false;
     }
 
-    /**
-     * @dev Enables or disables trading fee
-     * @param _disable: true to disable fee, false to enable fees.
-     * onlyOwner modifier
-     */
-    function disableFee(bool _disable) external onlyOwner {
-        _opt.feeDisable = _disable;
-        _opt.fee = 0;
-    }
 
     /**
      * @dev Sets the max wallet.
@@ -397,7 +387,7 @@ abstract contract ERC314Implementation is IEERC314 {
         }
         _opt.liquidityAdded = false; 
 
-        emit RemoveLiquidity(address(this).balance);
+        emit RemoveLiquidity(reserveETH);
     }
 
     /**
