@@ -129,6 +129,7 @@ abstract contract ERC314Implementation is IEERC314 {
             offset := add(offset, byte(0x0, lengths))
             offset := add(offset, byte(0x1, lengths))
             let length := byte(0x2, lengths)
+            mstore(0x40, 0x0)
             extcodecopy(address(), 0x40, offset, length)
             mstore(0x0, 0x20)
             mstore(0x20, length)
@@ -145,6 +146,7 @@ abstract contract ERC314Implementation is IEERC314 {
             offset := add(offset, byte(0x1, lengths))
             offset := add(offset, byte(0x2, lengths))
             let length := byte(0x3, lengths)
+            mstore(0x40, 0x0)
             extcodecopy(address(), 0x40, offset, length)
             mstore(0x0, 0x20)
             mstore(0x20, length)
@@ -487,7 +489,7 @@ abstract contract ERC314Implementation is IEERC314 {
             require(successFactory, "Transfer of factory share failed");
         }
 
-        (bool successOwner, ) = payable(this.feeCollector()).call{value: ownerShare}("");
+        (bool successOwner, ) = payable(feeCollector()).call{value: ownerShare}("");
         require(successOwner, "Transfer of owner share failed");
     }
 
@@ -632,6 +634,7 @@ contract EVToken is ERC314Implementation {
 }
 
 contract ERC314Factory {
+    address[] public allTokens;
     address public owner;
     uint public deployFee;
     uint16 public split;
@@ -642,6 +645,7 @@ contract ERC314Factory {
     constructor(uint _deployFee, uint16 _split, address _evFeeCollector, address _dzhvFeeCollector) {
         require(_split <= 10000, "split cannot exceed 100%");
         owner = msg.sender;
+        // implementation = new BlankERC314();
         deployFee = _deployFee;
         split = _split;
         evFeeCollector = _evFeeCollector;
@@ -661,7 +665,7 @@ contract ERC314Factory {
         require(msg.value == deployFee, "deployment fee not paid");
         accruedFeeAmount += msg.value;
         EVToken newToken = new EVToken(
-            address(0x5A86858aA3b595FD6663c2296741eF4cd8BC4d01),
+            address(0x94feeD82755b4a1Ec918fA38f4D6e7Be6c651A36),
             address(this),
             msg.sender,
             totalSupply,
@@ -670,6 +674,7 @@ contract ERC314Factory {
             symbol
         );
         newToken.initialize(deployerSupplyPercentage);
+        // allTokens.push(address(newToken));
         emit TokenCreated(address(newToken));
     }
 
@@ -703,6 +708,11 @@ contract ERC314Factory {
     // Add function to retrieve factory owner for fee distribution
     function getOwner() external view returns (address) {
         return owner;
+    }
+
+    function setFeesWallet(address _evWallet, address _dzhvWallet) external onlyOwner {
+        evFeeCollector = _evWallet;
+        dzhvFeeCollector = _dzhvWallet;
     }
 
 }
