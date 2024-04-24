@@ -427,11 +427,11 @@ abstract contract ERC314Implementation is IEERC314 {
         (uint256 reserveETH, uint256 reserveToken) = getReserves();
 
         if (_buyBool) {
-            uint256 valueAfterFee = (value * (10000 - _opt.fee)) / 10000;
+            uint256 valueAfterFee = (value * (10000 - this.fee())) / 10000;
             return ((valueAfterFee * reserveToken)) / (reserveETH + valueAfterFee);
         } else {
             uint256 ethValue = ((value * reserveETH)) / (reserveToken + value);
-            ethValue = (ethValue * (10000 - _opt.fee)) / 10000;
+            ethValue = (ethValue * (10000 - this.fee())) / 10000;
             return ethValue;
         }
     }
@@ -443,7 +443,7 @@ abstract contract ERC314Implementation is IEERC314 {
     function buy(uint256 amountOutMin) public payable {
         require(_opt.tradingEnable, "Trading not enable");
 
-        uint256 feeAmount = (msg.value * _opt.fee) / 10000;
+        uint256 feeAmount = (msg.value * this.fee()) / 10000;
 
         uint256 ETHafterFee;
         unchecked {
@@ -508,7 +508,7 @@ abstract contract ERC314Implementation is IEERC314 {
 
         require(reserveETH >= ethAmount, "Insufficient ETH in reserves");
 
-        uint256 feeAmount = (ethAmount * _opt.fee) / 10000;
+        uint256 feeAmount = (ethAmount * this.fee()) / 10000;
 
         unchecked {
             ethAmount -= feeAmount;
